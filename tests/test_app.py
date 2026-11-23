@@ -78,3 +78,51 @@ async def test_oauth_state_and_scopes(monkeypatch):
         assert 'offline' in query['scope'][0]
         assert query['redirect_uri'][0]=='https://dashboard.example/auth/callback'
         assert 'Secure' in res.headers['set-cookie']
+
+
+def test_next_sleep_pairs_with_workout_even_when_calendar_date_differs():
+    from analytics import transform
+    # An afternoon workout on November 21 belongs to the main sleep ending Nov 22.
+    records={
+      'cycles':[],
+      'sleep':[{'id':'sleep-22','start':'2026-11-21T23:40:00+01:00','end':'2026-11-22T07:10:00+01:00','score_state':'SCORED','nap':False,
+                'score':{'stage_summary':{'total_light_sleep_time_milli':4*3600000,'total_slow_wave_sleep_time_milli':90*60000,'total_rem_sleep_time_milli':90*60000},'sleep_performance_percentage':91}}],
+      'recovery':[{'sleep_id':'sleep-22','score_state':'SCORED','score':{'recovery_score':74,'hrv_rmssd_milli':62,'resting_heart_rate':54}}],
+      'workouts':[{'id':'golf-21','start':'2026-11-21T13:00:00+01:00','end':'2026-11-21T15:00:00+01:00','sport_name':'golf','score':{'strain':12.2}}]
+    }
+    d=transform(records,7,today=date(2026,11,23));pairs=d['connections']['pairs'];assert len(pairs)==1
+    p=pairs[0]
+    assert (p['date'],p['sport'],p['sleep_hours'],p['recovery'],p['workout_strain'])==('2026-11-22','Golf',7.0,74.0,12.2)
+
+
+def test_multiple_workouts_do_not_duplicate_the_following_night():
+    records={'cycles':[],
+      'sleep':[{'id':'s1','start':'2026-11-21T23:10:00+01:00','end':'2026-11-22T07:10:00+01:00','score_state':'SCORED','nap':False,'score':{'stage_summary':{'total_light_sleep_time_milli':4*3600000,'total_slow_wave_sleep_time_milli':2*3600000,'total_rem_sleep_time_milli':2*3600000}}}],
+      'recovery':[],
+      'workouts':[{'id':'w1','start':'2026-11-21T08:00:00+01:00','end':'2026-11-21T09:00:00+01:00','sport_name':'golf','score':{'strain':8}},
+                  {'id':'w2','start':'2026-11-21T18:00:00+01:00','end':'2026-11-21T19:00:00+01:00','sport_name':'weightlifting','score':{'strain':10}}]}
+    d=transform(records,7,today=date(2026,11,23));p=d['connections']['pairs']
+    assert len(p)==1 and p[0]['workout_count']==2 and p[0]['workout_strain']==10 and p[0]['sport']=='Krafttraining'
+    assert p[0]['recovery'] is None
+
+
+def test_failed_workout_collection_never_labels_nights_as_rest():
+    records=demo_collections(today=date(2026,11,22));records['workouts']=[]
+    d=transform(records,30,today=date(2026,11,22),workouts_available=False)
+    assert d['connections']['available'] is False
+    assert d['connections']['pairs']==[]
+
+
+def test_correlation_requires_eight_real_pairs_and_variance():
+    from analytics import pearson
+    assert pearson([(i,i) for i in range(7)]) is None
+    assert pearson([(i,2*i) for i in range(8)])==1.0
+    assert pearson([(i,5) for i in range(10)]) is None
+
+
+def test_demo_correlations_are_labeled_and_available():
+    d=transform(demo_collections(today=date(2026,11,22)),90,today=date(2026,11,22))
+    assert d['connections']['available'] is True
+    assert d['connections']['trained_nights']>10
+    assert d['connections']['rest_nights']>10
+    assert d['connections']['correlations']['recovery']['n']>8

@@ -4,6 +4,7 @@ import base64
 import hashlib
 import hmac
 import json
+import logging
 import os
 import secrets
 import time
@@ -26,6 +27,7 @@ CLIENT_ID=os.getenv('WHOOP_CLIENT_ID','').strip();CLIENT_SECRET=os.getenv('WHOOP
 SECRET=os.getenv('APP_SECRET') or secrets.token_urlsafe(48)
 CIPHER=Fernet(base64.urlsafe_b64encode(hashlib.sha256(SECRET.encode()).digest()))
 COOKIE='whoop_private';STATE='whoop_state';CACHE={};LOCK=asyncio.Lock()
+logging.getLogger('uvicorn.access').disabled = True  # OAuth callback URLs can include short-lived authorization codes.
 app=FastAPI(docs_url=None,redoc_url=None,openapi_url=None)
 app.mount('/static',StaticFiles(directory=str(ROOT/'static')),name='static')
 
@@ -111,10 +113,19 @@ async def fetch_data(access,days):
     for (name,_),r in zip(fields,result):
         if isinstance(r,Exception):
             if isinstance(r,httpx.HTTPStatusError) and r.response.status_code==401:raise PermissionError('WHOOP-Sitzung abgelaufen. Bitte erneut verbinden.')
-            data[name]=[];warnings.append(name+' gerade nicht verfügbar')
+            data[name]=[]
+            if isinstance(r,httpx.HTTPStatusError):
+                code=r.response.status_code
+                logging.warning('WHOOP %s collection returned HTTP %s',name,code)
+                if code==429: warnings.append(name+' wegen WHOOP-Abfragelimit vorübergehend nicht verfügbar (HTTP 429)')
+                elif code==403: warnings.append(name+' von WHOOP abgewiesen (HTTP 403)')
+                else: warnings.append(name+' gerade nicht verfügbar (HTTP '+str(code)+')')
+            else:
+                logging.warning('WHOOP %s collection failed with %s',name,type(r).__name__)
+                warnings.append(name+' gerade nicht verfügbar (Verbindungsfehler)')
         else:data[name]=r
     if len(warnings)==len(fields):raise ConnectionError('Keine Datenabrufe möglich')
-    return data,warnings
+    return data,warnings,not any('workouts ' in item for item in warnings)
 
 @app.get('/api/dashboard')
 async def dashboard(req:Request):
@@ -137,8 +148,8 @@ async def dashboard(req:Request):
             if rotated:save_cookie(resp,session,req)
             return resp
     try:
-        data,warnings=await fetch_data(session['access_token'],days)
-        result=transform(data,days);result['from']=result.pop('from_')
+        data,warnings,workouts_available=await fetch_data(session['access_token'],days)
+        result=transform(data,days,workouts_available=workouts_available);result['from']=result.pop('from_')
         result.update(demo=False,warnings=warnings,refreshed_at=datetime.now(TZ).isoformat(timespec='minutes'))
     except PermissionError as exc:return JSONResponse({'error':str(exc),'unauthorized':True},status_code=401)
     except (httpx.HTTPError,ValueError,ConnectionError):return JSONResponse({'error':'WHOOP antwortet aktuell nicht. Bitte später aktualisieren.'},status_code=502)
