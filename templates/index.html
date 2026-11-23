@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#08121a">
+  <meta name="description" content="Privates WHOOP Performance Dashboard mit aktuellen Erholungs-, Schlaf- und Trainingsdaten.">
+  <title>WHOOP Insights · Private Performance Analytics</title>
+  <link rel="stylesheet" href="/static/css/style.css">
+  <script src="/static/js/app.js" defer></script>
+</head>
+<body>
+  <div class="shell">
+    <aside class="sidebar">
+      <a class="brand" href="/" aria-label="WHOOP Insights Startseite"><span class="brand-mark"><span></span><span></span><span></span></span><span><strong>WHOOP</strong><small>INSIGHTS</small></span></a>
+      <div class="nav-section">DEIN COCKPIT</div>
+      <a class="nav-link active" href="#overview" data-tab="overview"><span class="nav-icon">◫</span> Übersicht</a>
+      <a class="nav-link" href="#sleep" data-tab="sleep"><span class="nav-icon">◷</span> Schlafanalyse</a>
+      <a class="nav-link" href="#training" data-tab="training"><span class="nav-icon">⌁</span> Belastung & Training</a>
+      <div class="sidebar-bottom"><div class="privacy-line"><span class="privacy-dot"></span> Private Verbindung</div><small>Die Sitzung wird verschlüsselt übertragen. Deine WHOOP-Messwerte werden nicht dauerhaft auf dem App-Server gespeichert.</small><button class="sidebar-logout" id="logoutSide" hidden>Verbindung trennen ↗</button></div>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <div class="mobile-logo"><span class="brand-mark tiny"><span></span><span></span><span></span></span><b>WHOOP <span>INSIGHTS</span></b></div>
+        <div class="breadcrumb">PERFORMANCE / <strong id="breadcrumb">ÜBERSICHT</strong></div>
+        <div class="topbar-right"><span class="status-pill" id="connectionPill"><span class="status-led"></span> Verbindung prüfen</span><button class="btn btn-icon" title="Daten aktualisieren" aria-label="Daten aktualisieren" id="refreshBtn">↻</button></div>
+      </header>
+
+      <section class="hero" id="hero">
+        <div class="hero-copy"><div class="eyebrow"><span class="eyebrow-line"></span> DEIN PERSÖNLICHES PERFORMANCE LAB</div><h1>Verstehe deinen Körper.<br><span>Erkenne deine Muster.</span></h1><p>Erholung, Schlaf und Belastung – alles auf einen Blick, mit echten Trends statt Datenrauschen.</p></div>
+        <div class="hero-orbit" aria-hidden="true"><div class="orb orb-a"></div><div class="orb orb-b"></div><div class="orb-center">W<span>INSIGHTS</span></div></div>
+      </section>
+
+      <section class="connection-panel" id="connectPanel" hidden>
+        <div class="panel-graphic">◎</div><div class="connection-copy"><h2>Deine Daten. Dein Dashboard.</h2><p>Verbinde WHOOP sicher per OAuth. Du erlaubst ausschließlich lesenden Zugriff auf Erholung, Schlaf, Belastung und Training.</p><div class="connection-actions"><a class="btn btn-primary" id="connectBtn" href="/auth/login">WHOOP sicher verbinden <span>↗</span></a><button class="btn btn-soft" id="demoBtn">Demoversion ansehen</button></div><p class="setup-hint" id="setupHint" hidden>Die Live-Verbindung ist noch nicht eingerichtet. Die Demo kannst du sofort testen.</p></div>
+      </section>
+
+      <section class="demo-alert" id="demoAlert" hidden><strong>DEMO-MODUS</strong><span>Alle dargestellten Werte sind Beispielwerte und stammen nicht aus deinem WHOOP-Konto.</span><a href="/" id="demoExit">Demo beenden</a></section>
+      <section class="error-alert" id="errorAlert" hidden role="alert"></section>
+
+      <section id="dashboard" hidden>
+        <div class="section-heading toolbar"><div><div class="overline">DEINE ANALYSE</div><h2 id="pageTitle">Performance Übersicht</h2><p id="rangeCaption">Aktuelle Trends und Kennzahlen</p></div><div class="period-picker" role="group" aria-label="Zeitraum wählen"><button data-days="7">7T</button><button data-days="30" class="selected">30T</button><button data-days="90">90T</button><button data-days="365">1J</button></div></div>
+        <div class="metric-grid" id="metricGrid"></div>
+        <div id="overviewTab" class="tab-content">
+          <div class="charts-grid"><article class="surface chart-card"><div class="chart-heading"><div><div class="overline">RECOVERY</div><h3>Deine Erholung im Verlauf</h3></div><span class="chart-tag">WHOOP SCORE</span></div><div class="plot" id="recoveryPlot"></div><div class="chart-footer">Die Kurve zeigt gemessene Tageswerte. Fehlende Tage werden nicht ergänzt.</div></article><article class="surface chart-card"><div class="chart-heading"><div><div class="overline">HERZFREQUENZVARIABILITÄT</div><h3>HRV-Entwicklung</h3></div><span class="chart-tag">MS</span></div><div class="plot" id="hrvPlot"></div><div class="chart-footer">HRV ist individuell. Vergleiche deine eigene Entwicklung statt fremde Zielwerte.</div></article></div>
+          <div class="charts-grid"><article class="surface chart-card"><div class="chart-heading"><div><div class="overline">NÄCHTLICHE ERHOLUNG</div><h3>Ruhepuls</h3></div><span class="chart-tag">BPM</span></div><div class="plot" id="rhrPlot"></div></article><article class="surface chart-card"><div class="chart-heading"><div><div class="overline">SCHLAF</div><h3>Schlafdauer</h3></div><span class="chart-tag">STUNDEN</span></div><div class="plot" id="sleepPlot"></div></article></div>
+        </div>
+        <div id="sleepTab" class="tab-content" hidden><div class="charts-grid"><article class="surface chart-card wide"><div class="chart-heading"><div><div class="overline">SCHLAFPHASEN</div><h3>Wie verteilt sich dein Schlaf?</h3></div><span class="chart-tag">Ø IM ZEITRAUM</span></div><div id="stagesPlot" class="sleep-stages"></div></article><article class="surface chart-card"><div class="chart-heading"><div><div class="overline">SCHLAFDAUER</div><h3>Schlaf im Zeitverlauf</h3></div></div><div class="plot" id="sleepDetailPlot"></div></article><article class="surface chart-card"><div class="chart-heading"><div><div class="overline">SCHLAFPERFORMANCE</div><h3>WHOOP Schlafperformance</h3></div></div><div class="plot" id="performancePlot"></div></article></div></div>
+        <div id="trainingTab" class="tab-content" hidden><div class="charts-grid"><article class="surface chart-card"><div class="chart-heading"><div><div class="overline">TAGESBELASTUNG</div><h3>Strain im Verlauf</h3></div><span class="chart-tag">WHOOP STRAIN</span></div><div class="plot" id="strainPlot"></div></article><article class="surface chart-card"><div class="chart-heading"><div><div class="overline">TRAININGSHISTORIE</div><h3>Letzte Aktivitäten</h3></div></div><div id="workoutList" class="workouts"></div></article></div></div>
+        <div class="bottom-grid"><article class="surface insight-card"><div class="chart-heading"><div><div class="overline">DEINE MUSTER</div><h3>Beobachtungen</h3></div><span class="insight-icon">✳</span></div><div id="insightList"></div><p class="legal-footnote">Deskriptive Vergleiche, keine medizinische Bewertung oder Aussage über Ursachen.</p></article><article class="surface data-card"><div class="chart-heading"><div><div class="overline">LETZTE MESSWERTE</div><h3>Deine letzten 7 Tage</h3></div><span class="chart-tag">DETAILS</span></div><div class="table-scroll"><table><thead><tr><th>TAG</th><th>RECOVERY</th><th>HRV</th><th>SCHLAF</th></tr></thead><tbody id="recentRows"></tbody></table></div></article></div>
+        <footer class="footer"><span>WHOOP INSIGHTS · PRIVATES PROJEKT</span><span id="lastUpdated">Noch nicht aktualisiert</span></footer>
+      </section>
+      <div id="loading" class="loading-block" hidden><div class="loader"></div><p>WHOOP-Daten werden geladen und aufbereitet …</p><small>Bei längeren Zeiträumen kann der erste Abruf etwas dauern.</small></div>
+    </main>
+  </div>
+</body>
+</html>
